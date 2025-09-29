@@ -60,7 +60,7 @@ def make_vtk_uniform_grid(img_arr_in,  scale_spacing=1.0,
     img_arr = np.transpose(img_arr_in) # New view, but not deep copy
 
     # Create the spatial reference
-    uni_grid = pv.UniformGrid()
+    uni_grid = pv.ImageData()
 
     # Set the grid dimensions: shape + 1 because we want to inject the values on
     # the CELL data
