@@ -909,9 +909,14 @@ def interact_hysteresis_threshold(img_in):
     img_obj = ax.imshow(img_out, cmap='gray', vmin=0, vmax=255)
     ax.set_xlabel("X Pixel Number")
     ax.set_ylabel("Y Pixel Number")
-
+    
     plt.subplots_adjust(bottom=0.26)
-
+    
+    # Status text for busy indicator
+    status_text = fig.text(0.5, 0.005, 'Ready', ha='center',
+                           fontsize=10, color='green',
+                           fontweight='bold')
+    
     # Create new axes objects for each button/slider/text widget
     # 4-tuple of floats rect = [left, bottom, width, height]. A new axes 
     # is added with dimensions rect in normalized (0, 1) units using 
@@ -930,21 +935,31 @@ def interact_hysteresis_threshold(img_in):
         nonlocal high_val_out
         nonlocal img_out
 
+        # Show busy indicator before computation
+        status_text.set_text('Computing...')
+        status_text.set_color('red')
+        fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+
         low_val_out = np.round(low_val_slider.val)
         low_val_out = low_val_out.astype(np.uint16)
 
         high_val_out = np.round(high_val_slider.val)
         high_val_out = high_val_out.astype(np.uint16)
 
-        img_temp = filt.apply_hysteresis_threshold(img_0, low_val_out, 
+        img_temp = filt.apply_hysteresis_threshold(img_0, low_val_out,
         high_val_out)
         img_out = img_as_ubyte(img_temp)
 
         # Update the image
         img_obj.set(data=img_out)
+
+        # Restore ready indicator
+        status_text.set_text('Ready')
+        status_text.set_color('green')
         fig.canvas.draw()
 
-    # Call the update function when the 'update' button is clicked
+    # Call the update function when the sliders are changed
     low_val_slider.on_changed(hysteresis_threshod_update)
     high_val_slider.on_changed(hysteresis_threshod_update)
 
@@ -973,11 +988,11 @@ def interact_hysteresis_threshold2(img_in):
     low_val_0 = thresh_arr[0]
     high_val_0 = thresh_arr[1]
 
-    img_temp = filt.apply_hysteresis_threshold(img_0, low_val_0, 
+    img_temp = filt.apply_hysteresis_threshold(img_0, low_val_0,
         high_val_0)
     img_temp = img_as_ubyte(img_temp)
 
-    # Global variables (within this function) that will be returned. 
+    # Global variables (within this function) that will be returned.
     # Initialize these to the starting values for now.
     low_val_out = low_val_0
     high_val_out = high_val_0
@@ -998,16 +1013,21 @@ def interact_hysteresis_threshold2(img_in):
 
     plt.subplots_adjust(bottom=0.26)
 
+    # Status text for busy indicator
+    status_text = fig.text(0.5, 0.005, 'Ready', ha='center',
+                           fontsize=10, color='green',
+                           fontweight='bold')
+
     # Create new axes objects for each button/slider/text widget
-    # 4-tuple of floats rect = [left, bottom, width, height]. A new axes 
-    # is added with dimensions rect in normalized (0, 1) units using 
+    # 4-tuple of floats rect = [left, bottom, width, height]. A new axes
+    # is added with dimensions rect in normalized (0, 1) units using
     # add_axes on the current figure.
     low_val_ax = fig.add_axes([0.22, 0.11, 0.15, 0.06])
-    low_val_text_box = TextBox(ax=low_val_ax, label='Lower Threshold  ', 
+    low_val_text_box = TextBox(ax=low_val_ax, label='Lower Threshold  ',
         initial=str(low_val_0), textalignment='center')
 
     high_val_ax = fig.add_axes([0.71, 0.11, 0.15, 0.06])
-    high_val_text_box = TextBox(ax=high_val_ax, label='Higher Threshold  ', 
+    high_val_text_box = TextBox(ax=high_val_ax, label='Higher Threshold  ',
         initial=str(high_val_0), textalignment='center')
 
     update_ax = plt.axes([0.25, 0.03, 0.5, 0.05])
@@ -1019,15 +1039,27 @@ def interact_hysteresis_threshold2(img_in):
         nonlocal high_val_out
         nonlocal img_out
 
+        # Show busy indicator before computation
+        status_text.set_text('Computing...')
+        status_text.set_color('red')
+        update_button.label.set_text('Computing...')
+        fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+
         low_val_out = int(low_val_text_box.text)
         high_val_out = int(high_val_text_box.text)
 
-        img_temp = filt.apply_hysteresis_threshold(img_0, low_val_out, 
+        img_temp = filt.apply_hysteresis_threshold(img_0, low_val_out,
         high_val_out)
         img_out = img_as_ubyte(img_temp)
 
         # Update the image
         img_obj.set(data=img_out)
+
+        # Restore ready indicator
+        status_text.set_text('Ready')
+        status_text.set_color('green')
+        update_button.label.set_text('Update')
         fig.canvas.draw()
 
     # Call the update function when the 'update' button is clicked
@@ -1424,6 +1456,13 @@ def interact_nl_means_denoise(img_in):
 
     plt.subplots_adjust(bottom=0.26)
 
+    plt.subplots_adjust(bottom=0.26)
+
+    # Status text for busy indicator
+    status_text = fig.text(0.5, 0.005, 'Ready', ha='center',
+                           fontsize=10, color='green',
+                           fontweight='bold')
+
     # Create new axes objects for each button/slider/text widget
     # 4-tuple of floats rect = [left, bottom, width, height]. A new axes 
     # is added with dimensions rect in normalized (0, 1) units using 
@@ -1445,29 +1484,37 @@ def interact_nl_means_denoise(img_in):
 
     # Update the figure anytime the 'update' button is clicked
     def nl_means_denoise_update(event):
-        # Use the new Python keyword 'nonlocal' to gain access and 
-        # update these variables from within this scope.
         nonlocal h_out
         nonlocal patch_size_out
         nonlocal patch_dist_out
         nonlocal img_out
-
-        # The GUI widgets are defined in a higher-level scope, so
-        # they can be accessed directly within this interior function 
+        
+        # Show busy indicator before computation
+        status_text.set_text('Computing...')
+        status_text.set_color('red')
+        update_button.label.set_text('Computing...')
+        fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+     
         h_out = float(h_text_box.text)
         patch_size_out = int(p_size_text_box.text)
         patch_dist_out = int(p_dist_text_box.text)
 
-        img_out = rest.denoise_nl_means(img_0, h=h_out, 
-        sigma=sig_noise, fast_mode=True, patch_size=patch_size_out, 
+        img_out = rest.denoise_nl_means(img_0, h=h_out,
+        sigma=sig_noise, fast_mode=True, patch_size=patch_size_out,
         patch_distance=patch_dist_out, channel_axis=None)
-
+        
         img_out = img_as_ubyte(img_out)
-
+        
         # Update the image
         img_obj.set(data=img_out)
-        fig.canvas.draw()
 
+        # Restore ready indicator
+        status_text.set_text('Ready')
+        status_text.set_color('green')
+        update_button.label.set_text('Update')
+        fig.canvas.draw()
+        
     # Call the update function when the 'update' button is clicked
     update_button.on_clicked(nl_means_denoise_update)
 
