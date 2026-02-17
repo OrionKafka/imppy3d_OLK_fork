@@ -5,6 +5,7 @@ from skimage import segmentation as seg
 from skimage import filters as filt
 from skimage import morphology as morph
 import skimage.feature as sfeature
+from skimage import util
 from skimage.util import img_as_bool, img_as_ubyte, img_as_float
 
 # Import local packages
@@ -383,6 +384,145 @@ def apply_driver_edge_detect(img_in, fltr_params_in, quiet_in=False):
                 f"    High Threshold: {high_thresh_out}")
 
     return img_fltr, mask_out
+
+
+def interact_driver_rolling_ball(img_in, radius_init=35):
+    """
+    Interactively implements rolling ball background subtraction on a
+    single 2D image slice. The output parameters of this function are
+    suitable for input for apply_driver_rolling_ball() below.
+
+    NOTE: This function operates on a single 2D image slice. For 3D
+    image stacks, call this on one representative slice to determine
+    the radius, then apply the result to each slice using
+    apply_driver_rolling_ball() in a loop. See the docstring of
+    interact_rolling_ball() for an example.
+
+    ---- INPUT ARGUMENTS ----
+    [img_in]: Numpy array for a single 2D grayscale image. It is
+        assumed that the image is already grayscale and of type uint8.
+        The array should thus be 2D (num_rows, num_cols), where each
+        value represents the intensity for each corresponding pixel.
+        Do not pass a 3D image stack; use a slice-by-slice loop
+        with apply_driver_rolling_ball() instead.
+
+    [radius_init]: Initial rolling ball radius in pixels. Default is 35.
+
+    ---- RETURNED ----
+    [img_out]: Returns the final 2D image after closing the interactive
+        session. img_out is in the same format as img_in.
+
+    ---- SIDE EFFECTS ----
+    Function input arguments are not altered. Nothing is written to the
+    hard drive. This function is a read-only function. It does pop-up
+    a new window that visualizes the provided image. Strings are printed
+    to standard output.
+    """
+
+    [img_fltr, fltr_params] = ifun.interact_rolling_ball(img_in,
+        radius_init=radius_init)
+
+    # Using this function just to write to standard output
+    apply_driver_rolling_ball(img_in, fltr_params)
+
+    return img_fltr
+
+
+def apply_driver_rolling_ball(img_in, fltr_params_in, quiet_in=False):
+    """
+    Applies rolling ball background subtraction to a single 2D image
+    slice. This is the non-interactive version of
+    interact_driver_rolling_ball().
+
+    The rolling ball algorithm estimates the background intensity by
+    rolling a ball of a given radius under the intensity surface.
+    Larger radii produce smoother background estimates, while smaller
+    radii follow local intensity variations more closely. This function
+    assumes that the features of interest are darker than the
+    background. Internally, the image is inverted before applying the
+    rolling ball, the estimated background is subtracted, and the
+    result is re-inverted. The function is rather expensive,
+    especially for larger values of radius.
+
+    NOTE: This function operates on a single 2D image slice. For 3D
+    image stacks, call this function in a slice-by-slice loop:
+
+        fltr_params = ["rolling_ball", 35]
+        for i in range(imgs_3d.shape[0]):
+            imgs_3d[i] = apply_driver_rolling_ball(
+                imgs_3d[i], fltr_params, quiet_in=True)
+
+    In some applications, one might consider varying the radius
+    based on i-location, if the intensity differences change as a
+    function of height. One could also re-slice the image if the
+    background variation one wishes to remove varies along height
+    instead of in width or depth. E.g., for serial sectioning one
+    might do this to overcome detector drift over sequences of images,
+    or one might apply it to both x-stack and z-stack direction if
+    background tone changes both side to side and vertically.
+
+    ---- INPUT ARGUMENTS ----
+    [img_in]: Numpy array for a single 2D grayscale image. It is
+        assumed that the image is already grayscale and of type uint8.
+        The array should thus be 2D (num_rows, num_cols), where each
+        value represents the intensity for each corresponding pixel.
+        Do not pass a 3D image stack; use a slice-by-slice loop
+        instead (see example above).
+
+    fltr_params_in: A list of parameters needed to perform the
+        background subtraction. The first parameter is a string, which
+        should be "rolling_ball". Example parameter list:
+
+            ["rolling_ball", radius]
+
+                radius: The rolling ball radius in pixels. Should be a
+                    positive integer. A larger radius results in a
+                    smoother background estimate.
+
+    quiet_in: A boolean that determines if this function should print
+        any statements to standard output. If False (default), outputs
+        are written. Conversely, if True, outputs are suppressed. This
+        is particularly useful in the event of batch processing
+        (e.g., looping over slices in a 3D stack).
+
+    ---- RETURNED ----
+    [img_out]: Returns the resultant 2D Numpy image after performing
+        the background subtraction. img_out is in the same format as
+        img_in.
+
+    ---- SIDE EFFECTS ----
+    Function input arguments are not altered. Nothing is written to the
+    hard drive. This function is a read-only function. Strings are
+    printed to standard output.
+    """
+
+    # ---- Local Copies ----
+    img = img_in.copy()
+    fltr_params = fltr_params_in
+    quiet = quiet_in
+
+    fltr_name = (fltr_params[0]).lower()
+
+    if fltr_name == "rolling_ball":
+        radius_in = int(fltr_params[1])
+
+        img_inv = util.invert(img)
+        bg = rest.rolling_ball(img_inv, radius=radius_in, nansafe=False)
+        bg = img_as_ubyte(bg)
+        img_fltr = util.invert(img_inv - bg)
+        img_fltr = img_as_ubyte(img_fltr)
+
+        if not quiet:
+            print(f"\nSuccessfully applied rolling ball background "
+                  f"subtraction:\n"
+                  f"    Rolling ball radius (pixels): {radius_in}")
+
+    else:
+        print(f"\nERROR: {fltr_name} is not a supported background "
+              f"subtraction method.")
+        img_fltr = img
+
+    return img_fltr
 
 
 def interact_driver_thresholding(img_in, fltr_name_in):
