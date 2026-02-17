@@ -8,6 +8,7 @@ from skimage import segmentation as seg
 from skimage import filters as filt
 from skimage import morphology as morph
 import skimage.feature as sfeature
+from skimage import util
 from skimage.util import img_as_bool, img_as_ubyte, img_as_float
 
 
@@ -356,7 +357,6 @@ def interact_canny_edge(img_in):
     return [img_out, mask_out, fltr_params]
 
 
-
 def interact_unsharp_mask(img_in):
     """
     Sharpens an image using unsharp masking, implemented in SciKit-Image
@@ -471,6 +471,177 @@ def interact_unsharp_mask(img_in):
 
     return [img_out, fltr_params]
 
+
+def interact_rolling_ball(img_in, radius_init=35):
+    """
+    Interactively tune rolling ball background subtraction on a single
+    2D grayscale image. The rolling ball algorithm estimates the
+    background intensity by rolling a ball of a given radius under
+    the intensity surface. Larger radii produce smoother background
+    estimates, while smaller radii follow local intensity variations
+    more closely. Especially for larger radii, this filter can be
+    rather computationally costly.
+
+    The algorithm is implemented via
+    skimage.restoration.rolling_ball(). This function assumes that the
+    features of interest are darker than the background. Internally,
+    the image is inverted before applying the rolling ball (so that the
+    algorithm sees light features on a dark background), the estimated
+    background is subtracted, and the result is re-inverted. A
+    three-panel display shows the original image, the background-
+    corrected result, and the estimated background. This is an
+    interactive function that uses Matplotlib widgets (TextBox, Button).
+
+    NOTE: This function operates on a single 2D image slice. For 3D
+    image stacks, apply this function to one representative slice to
+    determine the radius parameter, then use
+    apply_driver_rolling_ball() in a slice-by-slice loop over the
+    full stack. For example:
+
+        # Tune interactively on one slice
+        [_, fltr_params] = interact_rolling_ball(imgs_3d[0])
+
+        # Apply to every slice in the 3D stack
+        for i in range(imgs_3d.shape[0]):
+            imgs_3d[i] = apply_driver_rolling_ball(
+                imgs_3d[i], fltr_params, quiet_in=True)
+
+    Depending on application, you could also set several different
+    rolling-ball radii depending on i-location in the stack, for
+    instance.
+
+     ---- INPUT ARGUMENTS ----
+    [img_in]: Numpy array for a single 2D grayscale image. It is
+        assumed that the image is already grayscale and of type uint8.
+        The array should thus be 2D (num_rows, num_cols), where each
+        value represents the intensity for each corresponding pixel.
+        Do not pass a 3D image stack; use a slice-by-slice loop
+        with apply_driver_rolling_ball() instead.
+
+    [radius_init]: Initial rolling ball radius in pixels. A larger
+        radius results in a smoother background estimate, but take
+        longer to compute. Default is 35.
+
+     ---- RETURNED ----
+    [[img_out], [fltr_params]]: Returns a list containing the resultant
+        image and the parameters used for the filter. img_out is a
+        background-corrected 2D image in the same format as img_in.
+        fltr_params is also a list, which contains the final parameters
+        used during the interactive session. The first item is the
+        string name of the filter that was used, in this case
+        "rolling_ball". For this function, the [fltr_params] list
+        contains:
+
+            ["rolling_ball", radius_out]
+
+                radius_out: The rolling ball radius in pixels. Should
+                    be a positive integer.
+
+     ---- SIDE EFFECTS ----
+    Function input arguments are not altered. Nothing is written to the
+    hard drive. This function is a read-only function. It does pop-up
+    a new window that visualizes the provided image. Strings are printed
+    to standard output.
+    """
+
+    img_0 = img_in.copy()
+
+    # Initial processing
+    radius_out = int(radius_init)
+
+    img_inv = util.invert(img_0)
+    bg = rest.rolling_ball(img_inv, radius=radius_out, nansafe=False)
+    bg = img_as_ubyte(bg)
+    img_out = util.invert(img_inv - bg)
+    img_out = img_as_ubyte(img_out)
+
+    # Create figure with 3 panels: original, corrected, background
+    fig_size = (16, 6)
+
+    fig, (ax_orig, ax_corr, ax_bg) = plt.subplots(1, 3)
+    fig.set_size_inches(fig_size[0], fig_size[1])
+
+    ax_orig.imshow(img_0, cmap='gray', vmin=0, vmax=255)
+    ax_orig.set_title("Original")
+    ax_orig.set_xlabel("X Pixel Number")
+    ax_orig.set_ylabel("Y Pixel Number")
+
+    img_corr_obj = ax_corr.imshow(img_out, cmap='gray', vmin=0, vmax=255)
+    ax_corr.set_title(f"Background-corrected (r={radius_out})")
+    ax_corr.set_xlabel("X Pixel Number")
+    ax_corr.set_ylabel("Y Pixel Number")
+
+    img_bg_obj = ax_bg.imshow(bg, cmap='gray', vmin=0, vmax=255)
+    ax_bg.set_title("Estimated background")
+    ax_bg.set_xlabel("X Pixel Number")
+    ax_bg.set_ylabel("Y Pixel Number")
+
+    plt.subplots_adjust(bottom=0.20)
+
+    # Status text for busy indicator
+    status_text = fig.text(0.5, 0.01, 'Ready', ha='center',
+                           fontsize=10, color='green',
+                           fontweight='bold')
+
+    # Create new axes objects for each widget.
+    # 4-tuple of floats rect = [left, bottom, width, height]. A new axes
+    # is added with dimensions rect in normalized (0, 1) units using
+    # add_axes on the current figure.
+    radius_ax = fig.add_axes([0.35, 0.06, 0.12, 0.06])
+    radius_text_box = TextBox(ax=radius_ax, label='Radius (px)  ',
+                              initial=str(radius_out),
+                              textalignment='center')
+
+    update_ax = fig.add_axes([0.55, 0.06, 0.15, 0.06])
+    update_button = Button(update_ax, 'Update')
+
+    # Update the figure anytime the 'update' button is clicked
+    def rolling_ball_update(event):
+        # Use the new Python keyword 'nonlocal' to gain access and
+        # update these variables from within this scope.
+        nonlocal radius_out
+        nonlocal img_out
+
+        # Show busy indicator before computation
+        status_text.set_text('Computing...')
+        status_text.set_color('red')
+        update_button.label.set_text('Computing...')
+        fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+
+        # The GUI widgets are defined in a higher-level scope, so
+        # they can be accessed directly within this interior function
+        radius_out = int(radius_text_box.text)
+        if radius_out < 1:
+            radius_out = 1
+
+        img_inv = util.invert(img_0)
+        bg = rest.rolling_ball(img_inv, radius=radius_out, nansafe=False)
+        bg = img_as_ubyte(bg)
+        img_out = util.invert(img_inv - bg)
+        img_out = img_as_ubyte(img_out)
+
+        # Update the images
+        img_corr_obj.set(data=img_out)
+        img_bg_obj.set(data=bg)
+        ax_corr.set_title(f"Background-corrected (r={radius_out})")
+
+        # Restore ready indicator
+        status_text.set_text('Ready')
+        status_text.set_color('green')
+        update_button.label.set_text('Update')
+        fig.canvas.draw()
+
+    # Call the update function when the 'update' button is clicked
+    update_button.on_clicked(rolling_ball_update)
+
+    plt.show()
+
+    # Save final filter parameters
+    fltr_params = ["rolling_ball", radius_out]
+
+    return [img_out, fltr_params]
+    
 
 def interact_global_thresholding(img_in):
     """
