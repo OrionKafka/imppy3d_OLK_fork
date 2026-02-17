@@ -643,6 +643,109 @@ def interact_rolling_ball(img_in, radius_init=35):
     return [img_out, fltr_params]
     
 
+def interact_segmentation_type():
+    """
+    Display a window with three buttons to choose a segmentation type:
+    Global, Adaptive, or Hysteresis. The selected button stays
+    highlighted in green so the user can confirm their choice before
+    closing the window.
+
+    This function is intended to be called before
+    interact_driver_thresholding() so the user can choose which
+    thresholding algorithm to use interactively, rather than
+    commenting/uncommenting code blocks.
+
+     ---- INPUT ARGUMENTS ----
+    None.
+
+     ---- RETURNED ----
+    [seg_type]: A string, one of "global_threshold",
+        "adaptive_threshold", or "hysteresis_threshold_text". These
+        strings match the thresh_type argument expected by
+        interact_driver_thresholding() in ski_driver_functions.py.
+
+     ---- SIDE EFFECTS ----
+    Function input arguments are not altered. Nothing is written to the
+    hard drive. This function is a read-only function. It does pop-up
+    a new window for the user to make a selection. Strings are printed
+    to standard output.
+    """
+
+    # Default selection
+    seg_type = "global_threshold"
+
+    fig, ax = plt.subplots(1, 1)
+    fig.set_size_inches(6, 3)
+    ax.set_visible(False)
+    fig.suptitle("Choose segmentation type, then close this window",
+                 fontsize=12)
+
+    plt.subplots_adjust(bottom=0.35, top=0.80)
+
+    global_ax = fig.add_axes([0.08, 0.10, 0.24, 0.15])
+    global_button = Button(global_ax, 'Global')
+
+    adaptive_ax = fig.add_axes([0.38, 0.10, 0.24, 0.15])
+    adaptive_button = Button(adaptive_ax, 'Adaptive')
+
+    hysteresis_ax = fig.add_axes([0.68, 0.10, 0.24, 0.15])
+    hysteresis_button = Button(hysteresis_ax, 'Hysteresis')
+
+    # Status text showing current selection
+    status_text = fig.text(0.5, 0.35, 'Selected: Global',
+                           ha='center', fontsize=12,
+                           fontweight='bold')
+
+    # Store default button color for resetting unselected buttons
+    default_color = global_button.color
+
+    def _set_button_color(button, color):
+        """Set a Button's persistent color (survives redraws)."""
+        button.color = color
+        button.hovercolor = color
+        button.ax.set_facecolor(color)
+
+    # Highlight the default selection
+    _set_button_color(global_button, 'lightgreen')
+
+    def select_global(event):
+        nonlocal seg_type
+        seg_type = "global_threshold"
+        status_text.set_text('Selected: Global')
+        _set_button_color(global_button, 'lightgreen')
+        _set_button_color(adaptive_button, default_color)
+        _set_button_color(hysteresis_button, default_color)
+        fig.canvas.draw()
+
+    def select_adaptive(event):
+        nonlocal seg_type
+        seg_type = "adaptive_threshold"
+        status_text.set_text('Selected: Adaptive')
+        _set_button_color(global_button, default_color)
+        _set_button_color(adaptive_button, 'lightgreen')
+        _set_button_color(hysteresis_button, default_color)
+        fig.canvas.draw()
+
+    def select_hysteresis(event):
+        nonlocal seg_type
+        seg_type = "hysteresis_threshold_text"
+        status_text.set_text('Selected: Hysteresis')
+        _set_button_color(global_button, default_color)
+        _set_button_color(adaptive_button, default_color)
+        _set_button_color(hysteresis_button, 'lightgreen')
+        fig.canvas.draw()
+
+    global_button.on_clicked(select_global)
+    adaptive_button.on_clicked(select_adaptive)
+    hysteresis_button.on_clicked(select_hysteresis)
+
+    plt.show()
+
+    print(f"\n  Segmentation type selected: {seg_type}")
+
+    return seg_type
+    
+
 def interact_global_thresholding(img_in):
     """
     Applies a simple threshold to a grayscale image resulting in a
