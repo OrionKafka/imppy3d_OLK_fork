@@ -699,7 +699,7 @@ def apply_driver_thresholding(img_in, fltr_params_in, quiet_in=False):
                 f"    Offset (+/-): {thresh_offset}")
 
     else:
-        print(f"\nERROR: {fltr_name} is not a supported sharpening filter.")
+        print(f"\nERROR: {fltr_name} is not a supported thresholding filter.")
         img_fltr = img
 
     return img_fltr
