@@ -22,7 +22,7 @@ import imppy3d.cv_processing_wrappers as cwrap
 import imppy3d.import_export as imex
 import imppy3d.plt_wrappers as pwrap
 import imppy3d.ski_driver_functions as sdrv
-
+import imppy3d.ski_interactive_processing as sint
 
 # Set constants related to plotting (for MatPlotLib)
 SMALL_SIZE = 10
@@ -91,19 +91,14 @@ print(f"\nInitiating interactive sharpening filter...")
 img2 = sdrv.interact_driver_sharpen(img2, "unsharp_mask")
 
 
-# -------- GLOBAL THRESHOLDING --------
-print(f"\nInitiating interactive global thresholding...")
-img2 = sdrv.interact_driver_thresholding(img2, "global_threshold")
+# -------- SEGMENTATION TYPE SELECTOR --------
+print(f"\\nChoose a segmentation type...")
+seg_type = sint.interact_segmentation_type()
 
 
-# -------- ADAPTIVE THRESHOLDING --------
-#print(f"\nInitiating interactive adaptive thresholding...")
-#img2 = sdrv.interact_driver_thresholding(img2, "adaptive_threshold")
-
-
-# -------- HYSTERESIS THRESHOLDING --------
-#print(f"\nInitiating interactive hysteresis thresholding...")
-#img2 = sdrv.interact_driver_thresholding(img2, "hysteresis_threshold_text")
+# -------- THRESHOLDING (dispatched by selector) --------
+print(f"\\nInitiating interactive {seg_type} thresholding...")
+img2 = sdrv.interact_driver_thresholding(img2, seg_type)
 
 
 # -------- MORPHOLOGICAL OPERATIONS --------
